@@ -7,6 +7,7 @@ import {Bus} from './bus';
 import {ConnectionContext} from './connectionContext';
 import {ChannelContext} from './channelContext';
 import {RabbitMqEndpointAddress} from './RabbitMqEndpointAddress';
+import { MessageType } from './messageType';
 
 export interface SendEndpointArguments {
     exchange?: string
@@ -15,6 +16,7 @@ export interface SendEndpointArguments {
     durable?: boolean
     autodelete?: boolean
     exchangeType?: string
+    messageType?: MessageType
 }
 
 export interface Transport {
@@ -76,7 +78,7 @@ export class Transport extends EventEmitter implements Transport {
         let exchange: string = args.exchange ?? '';
         let routingKey = (args.exchange ? args.routingKey : args.queue) ?? '';
 
-        return new SendEndpoint(this, exchange, routingKey);
+        return new SendEndpoint(this, args.messageType, exchange, routingKey);
     }
 
     async send<T extends MessageMap>(exchange: string, routingKey: string, send: SendContext<T>) {

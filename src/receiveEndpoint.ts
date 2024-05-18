@@ -122,6 +122,7 @@ export class ReceiveEndpoint extends Transport implements ReceiveEndpointConfigu
         await channel.bindQueue(this.queueName, this.queueName, '');
 
         for (const messageType of this.boundEvents) {
+            await channel.assertExchange(messageType.toExchange(), 'fanout', this.options);
             await channel.bindExchange(this.queueName, messageType.toExchange(), '');
         }
 

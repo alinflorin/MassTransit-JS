@@ -33,7 +33,7 @@ export class RequestClient<TRequest extends MessageMap, TResponse extends Messag
 
             this.responses[requestId] = new ResponseFuture<TResponse>(requestId, resolve, reject);
 
-            await this.sendEndpoint.send<TRequest>(request, x => {
+            await this.sendEndpoint.send<TRequest>(request, this.requestType, x => {
                 x.requestId = requestId;
                 x.responseAddress = this.responseAddress;
                 x.messageType = this.requestType.toMessageType();
