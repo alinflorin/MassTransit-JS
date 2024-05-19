@@ -97,13 +97,17 @@ export class AsyncReceiveEndpoint extends Transport implements AsyncReceiveEndpo
 
                     let deserializer = this._messageTypes[messageType];
                     if (deserializer instanceof AsyncMessageTypeDeserializer) {
-                        await deserializer.handle(text);
+                        await deserializer.handle(text, msg, channel);
                     }
                 }
-
-                channel.ack(msg);
+                if (!this.options.disableAutoAck) {
+                    channel.ack(msg);
+                }
             } catch (e) {
-                channel.reject(msg, true);
+                console.error(e);
+                if (!this.options.disableAutoAck) {
+                    channel.reject(msg, true);
+                }
             }
         }, this.options);
 
@@ -138,11 +142,13 @@ export class AsyncMessageTypeDeserializer<T extends MessageMap> {
         this.handler = handler;
     }
 
-    handle(json: string): Promise<void> {
+    handle(json: string, om: ConsumeMessage, cc: ConfirmChannel): Promise<void> {
 
         let context = <ConsumeContext<T>>deserialize(ConsumeContext, json);
 
         context.receiveEndpoint = this.receiveEndpoint;
+        context.originalMessage = om;
+        context.confirmChannel = cc;
 
         return this.handler(context)
     }

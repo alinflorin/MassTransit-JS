@@ -6,9 +6,12 @@ import {ReceiveEndpoint} from './receiveEndpoint';
 import {RabbitMqEndpointAddress} from './RabbitMqEndpointAddress';
 import {AsyncReceiveEndpoint} from './AsyncReceiveEndpoint';
 import { MessageType } from './messageType';
+import { ConfirmChannel, ConsumeMessage } from 'amqplib';
 
 export interface ConsumeContext<T extends object> extends MessageContext {
     message: T;
+    originalMessage: ConsumeMessage;
+    confirmChannel: ConfirmChannel;
 
     respond<T extends MessageMap>(message: T, messageType: MessageType | undefined, cb?: (send: SendContext<T>) => void): Promise<void>
 }
@@ -29,6 +32,8 @@ export class ConsumeContext<T extends object> implements ConsumeContext<T> {
     headers?: object;
     host?: Host;
     message!: T;
+    originalMessage!: ConsumeMessage;
+    confirmChannel!: ConfirmChannel;
 
     async respond<T extends MessageMap>(message: T, messageType: MessageType | undefined = undefined, cb?: (send: SendContext<T>) => void): Promise<void> {
         if (this.responseAddress) {

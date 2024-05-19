@@ -97,14 +97,18 @@ export class ReceiveEndpoint extends Transport implements ReceiveEndpointConfigu
 
                     let deserializer = this._messageTypes[messageType];
                     if (deserializer instanceof MessageTypeDeserializer) {
-                        deserializer.dispatch(text);
+                        deserializer.dispatch(text, msg, channel);
                     }
                 }
-
-                channel.ack(msg);
+                if (!this.options.disableAutoAck) {
+                    channel.ack(msg);
+                }
             }
             catch (e) {
-                channel.reject(msg, true);
+                console.error(e);
+                if (!this.options.disableAutoAck) {
+                    channel.reject(msg, true);
+                }
             }
         }, this.options);
 
@@ -143,6 +147,7 @@ export interface ReceiveEndpointOptions extends Options.AssertQueue, Options.Ass
     deadLetterRoutingKey?: string
     maxLength?: number
     maxPriority?: number
+    disableAutoAck?: boolean;
 }
 
 export const defaultReceiveEndpointOptions: ReceiveEndpointOptions = {
@@ -151,6 +156,7 @@ export const defaultReceiveEndpointOptions: ReceiveEndpointOptions = {
     durable: true,
     autoDelete: false,
     noAck: false,
+    disableAutoAck: false
 };
 
 
