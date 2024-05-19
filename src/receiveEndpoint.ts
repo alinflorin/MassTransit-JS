@@ -105,7 +105,6 @@ export class ReceiveEndpoint extends Transport implements ReceiveEndpointConfigu
                 }
             }
             catch (e) {
-                console.error(e);
                 if (!this.options.disableAutoAck) {
                     channel.reject(msg, true);
                 }

@@ -104,7 +104,7 @@ export class AsyncReceiveEndpoint extends Transport implements AsyncReceiveEndpo
                     channel.ack(msg);
                 }
             } catch (e) {
-                console.error(e);
+                
                 if (!this.options.disableAutoAck) {
                     channel.reject(msg, true);
                 }

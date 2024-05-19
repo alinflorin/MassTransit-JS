@@ -1,6 +1,6 @@
 {
   "name": "masstransit-rabbitmq",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "MassTransit for JavaScript, RabbitMQ",
   "main": "dist/bus.js",
   "typings": "dist/bus",
