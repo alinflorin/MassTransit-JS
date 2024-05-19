@@ -1,161 +1,243 @@
-import {ConfirmChannel, ConsumeMessage, Options} from 'amqplib';
-import {Bus} from './bus';
-import {deserialize} from 'class-transformer';
-import {ConsumeContext} from './consumeContext';
-import {MessageContext} from './messageContext';
-import {MessageMap, MessageTypeDeserializer} from './serialization';
-import {SendEndpoint} from './sendEndpoint';
-import {SendEndpointArguments, Transport} from './transport';
-import {ChannelContext} from './channelContext';
-import {MessageType} from './messageType';
-import {EndpointSettings, RabbitMqEndpointAddress, RabbitMqHostAddress} from './RabbitMqEndpointAddress';
+import { ConfirmChannel, ConsumeMessage, Options } from "amqplib";
+import { Bus } from "./bus";
+import { deserialize } from "class-transformer";
+import { ConsumeContext } from "./consumeContext";
+import { MessageContext } from "./messageContext";
+import { MessageMap, MessageTypeDeserializer } from "./serialization";
+import { SendEndpoint } from "./sendEndpoint";
+import { SendEndpointArguments, Transport } from "./transport";
+import { ChannelContext } from "./channelContext";
+import { MessageType } from "./messageType";
+import {
+  EndpointSettings,
+  RabbitMqEndpointAddress,
+  RabbitMqHostAddress,
+} from "./RabbitMqEndpointAddress";
 
 /**
  * Configure the receive endpoint, including any message handlers
  */
 export interface ReceiveEndpointConfigurator {
-    queueName: string
-    options: ReceiveEndpointOptions
+  queueName: string;
+  options: ReceiveEndpointOptions;
 
-    handle<T extends MessageMap>(messageType: MessageType, listener: (message: ConsumeContext<T>) => void): this
+  handle<T extends MessageMap>(
+    messageType: MessageType,
+    listener: (message: ConsumeContext<T>) => void
+  ): this;
 }
 
 export interface ReceiveEndpoint {
-    hostAddress: RabbitMqHostAddress
-    address: RabbitMqEndpointAddress
+  hostAddress: RabbitMqHostAddress;
+  address: RabbitMqEndpointAddress;
 
-    sendEndpoint(args: SendEndpointArguments): SendEndpoint
+  sendEndpoint(args: SendEndpointArguments): SendEndpoint;
 }
 
-export class ReceiveEndpoint extends Transport implements ReceiveEndpointConfigurator, ReceiveEndpoint {
-    queueName: string;
-    options: ReceiveEndpointOptions;
+export class ReceiveEndpoint
+  extends Transport
+  implements ReceiveEndpointConfigurator, ReceiveEndpoint
+{
+  queueName: string;
+  options: ReceiveEndpointOptions;
 
-    handle<T extends Record<string, any>>(messageType: MessageType, listener: (message: ConsumeContext<T>) => void): this {
+  handle<T extends Record<string, any>>(
+    messageType: MessageType,
+    listener: (message: ConsumeContext<T>) => void
+  ): this {
+    if (!messageType) throw new Error(`Invalid argument: messageType`);
 
-        if (!messageType)
-            throw new Error(`Invalid argument: messageType`);
+    let typeName = messageType.toString();
 
-        let typeName = messageType.toString();
-
-        if (this._messageTypes.hasOwnProperty(typeName)) {
-            this._messageTypes[typeName].on(listener);
-        } else {
-            let deserializer = new MessageTypeDeserializer<T>(this);
-            this._messageTypes[typeName] = deserializer;
-            deserializer.on(listener);
-            this.boundEvents.push(messageType);
-        }
-
-        return this;
+    if (this._messageTypes.hasOwnProperty(typeName)) {
+      this._messageTypes[typeName].on(listener);
+    } else {
+      let deserializer = new MessageTypeDeserializer<T>(this);
+      this._messageTypes[typeName] = deserializer;
+      deserializer.on(listener);
+      this.boundEvents.push(messageType);
     }
 
-    private readonly _messageTypes: MessageMap;
-    private readonly boundEvents: MessageType[] = [];
+    return this;
+  }
 
-    constructor(bus: Bus, queueName: string, cb?: (cfg: ReceiveEndpointConfigurator) => void, options: ReceiveEndpointOptions = defaultReceiveEndpointOptions) {
-        super(bus);
+  private readonly _messageTypes: MessageMap;
+  private readonly boundEvents: MessageType[] = [];
 
-        this.queueName = queueName;
-        this.options = options;
-        this.hostAddress = bus.hostAddress;
-        this._messageTypes = {};
+  constructor(
+    bus: Bus,
+    queueName: string,
+    cb?: (cfg: ReceiveEndpointConfigurator) => void,
+    options: ReceiveEndpointOptions = defaultReceiveEndpointOptions
+  ) {
+    super(bus);
 
-        if (cb) cb(this);
+    this.queueName = queueName;
+    this.options = options;
+    this.hostAddress = bus.hostAddress;
+    this._messageTypes = {};
 
-        let settings: EndpointSettings = {name: queueName, ...options};
+    if (cb) cb(this);
 
-        this.address = new RabbitMqEndpointAddress(bus.hostAddress, settings);
+    let settings: EndpointSettings = { name: queueName, ...options };
 
-        this.on('channel', (context) => this.onChannel(context));
-    }
+    this.address = new RabbitMqEndpointAddress(bus.hostAddress, settings);
 
-    emitMessage(msg: ConsumeMessage): void {
-        this.emit('message', msg);
-    }
+    this.on("channel", (context) => this.onChannel(context));
+  }
 
-    private async onChannel(context: ChannelContext): Promise<void> {
-        const _this = this;
+  emitMessage(msg: ConsumeMessage): void {
+    this.emit("message", msg);
+  }
 
-        let channel = context.channel;
+  private async onChannel(context: ChannelContext): Promise<void> {
+    const _this = this;
 
-        await this.configureTopology(channel);
+    let channel = context.channel;
 
-        let consume = await channel.consume(this.queueName, (msg: ConsumeMessage | null) => {
-            if (msg === null) return;
+    await this.configureTopology(channel);
 
-            try {
-                _this.emit('message', msg);
+    let consume = await channel.consume(
+      this.queueName,
+      (msg: ConsumeMessage | null) => {
+        if (msg === null) return;
 
-                let text = msg.content.toString();
+        try {
+          _this.emit("message", msg);
 
-                let context = deserialize(MessageContext, text);
+          let text = msg.content.toString();
 
-                if (context && context.messageType && context.messageType.length > 0) {
+          let context = deserialize(MessageContext, text);
 
-                    let messageType = context.messageType[0];
+          if (
+            context &&
+            context.messageType &&
+            context.messageType.length > 0
+          ) {
+            let messageType = context.messageType[0];
 
-                    let deserializer = this._messageTypes[messageType];
-                    if (deserializer instanceof MessageTypeDeserializer) {
-                        deserializer.dispatch(text, msg, channel);
-                    }
-                }
-                if (!this.options.disableAutoAck) {
-                    channel.ack(msg);
-                }
+            let deserializer = this._messageTypes[messageType];
+            if (deserializer instanceof MessageTypeDeserializer) {
+              deserializer.dispatch(text, msg, channel);
             }
-            catch (e) {
-                if (!this.options.disableAutoAck) {
-                    channel.reject(msg, true);
+          }
+          if (!this.options.disableAutoAck) {
+            channel.ack(msg);
+          }
+        } catch (e) {
+          if (!msg.properties.headers) {
+            msg.properties.headers = {};
+          }
+          let currentRetries = msg.properties.headers!["x-retries"]
+            ? +msg.properties.headers!["x-retries"]
+            : 0;
+
+          let newRetries = currentRetries + 1;
+          msg.properties.headers["x-retries"] = newRetries;
+
+          if (!this.options.disableAutoAck) {
+            channel.reject(msg, false);
+            if (
+              !this.options.disableRepublishOnError &&
+              (!this.options.maxRetries ||
+                (this.options.maxRetries &&
+                  newRetries < this.options.maxRetries!))
+            ) {
+              channel.publish(
+                msg.fields.exchange,
+                msg.fields.routingKey,
+                msg.content,
+                {
+                  contentType: msg.properties.contentType,
+                  deliveryMode: msg.properties.deliveryMode,
+                  contentEncoding: msg.properties.contentEncoding,
+                  appId: msg.properties.appId,
+                  correlationId: msg.properties.correlationId,
+                  expiration: msg.properties.expiration,
+                  headers: msg.properties.headers,
+                  messageId: msg.properties.messageId,
+                  priority: msg.properties.priority,
+                  replyTo: msg.properties.replyTo,
+                  timestamp: msg.properties.timestamp,
+                  type: msg.properties.type,
+                  userId: msg.properties.userId,
                 }
+              );
             }
-        }, this.options);
-
-        this.options.consumerTag = consume.consumerTag;
-
-        console.log('Receive endpoint started:', this.queueName, 'ConsumerTag:', consume.consumerTag);
-    }
-
-    private async configureTopology(channel: ConfirmChannel) {
-        await channel.prefetch(this.options.prefetchCount, this.options.globalPrefetch);
-
-        await channel.assertExchange(this.queueName, 'fanout', this.options);
-        let queue = await channel.assertQueue(this.queueName, this.options);
-
-        await channel.bindQueue(this.queueName, this.queueName, '');
-
-        for (const messageType of this.boundEvents) {
-            await channel.assertExchange(messageType.toExchange(), 'fanout', this.options);
-            await channel.bindExchange(this.queueName, messageType.toExchange(), '');
+          }
         }
+      },
+      this.options
+    );
 
-        console.log('Queue:', queue.queue, 'MessageCount:', queue.messageCount, 'ConsumerCount:', queue.consumerCount);
+    this.options.consumerTag = consume.consumerTag;
+
+    console.log(
+      "Receive endpoint started:",
+      this.queueName,
+      "ConsumerTag:",
+      consume.consumerTag
+    );
+  }
+
+  private async configureTopology(channel: ConfirmChannel) {
+    await channel.prefetch(
+      this.options.prefetchCount,
+      this.options.globalPrefetch
+    );
+
+    await channel.assertExchange(this.queueName, "fanout", this.options);
+    let queue = await channel.assertQueue(this.queueName, this.options);
+
+    await channel.bindQueue(this.queueName, this.queueName, "");
+
+    for (const messageType of this.boundEvents) {
+      await channel.assertExchange(
+        messageType.toExchange(),
+        "fanout",
+        this.options
+      );
+      await channel.bindExchange(this.queueName, messageType.toExchange(), "");
     }
+
+    console.log(
+      "Queue:",
+      queue.queue,
+      "MessageCount:",
+      queue.messageCount,
+      "ConsumerCount:",
+      queue.consumerCount
+    );
+  }
 }
 
-export interface ReceiveEndpointOptions extends Options.AssertQueue, Options.AssertExchange, Options.Consume {
-    prefetchCount: number
-    globalPrefetch: boolean
-    exclusive?: boolean
-    durable?: boolean
-    autoDelete?: boolean
-    arguments?: any
-    messageTtl?: number
-    expires?: number
-    deadLetterExchange?: string
-    deadLetterRoutingKey?: string
-    maxLength?: number
-    maxPriority?: number
-    disableAutoAck?: boolean;
+export interface ReceiveEndpointOptions
+  extends Options.AssertQueue,
+    Options.AssertExchange,
+    Options.Consume {
+  prefetchCount: number;
+  globalPrefetch: boolean;
+  exclusive?: boolean;
+  durable?: boolean;
+  autoDelete?: boolean;
+  arguments?: any;
+  messageTtl?: number;
+  expires?: number;
+  deadLetterExchange?: string;
+  deadLetterRoutingKey?: string;
+  maxLength?: number;
+  maxPriority?: number;
+  disableAutoAck?: boolean;
+  disableRepublishOnError?: boolean;
+  maxRetries?: number;
 }
 
 export const defaultReceiveEndpointOptions: ReceiveEndpointOptions = {
-    prefetchCount: 1,
-    globalPrefetch: true,
-    durable: true,
-    autoDelete: false,
-    noAck: false,
-    disableAutoAck: false
+  prefetchCount: 1,
+  globalPrefetch: true,
+  durable: true,
+  autoDelete: false,
+  noAck: false,
+  disableAutoAck: false,
+  disableRepublishOnError: false,
 };
-
-
