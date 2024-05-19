@@ -182,7 +182,7 @@ export class ReceiveEndpoint
 
   private async configureTopology(channel: ConfirmChannel) {
     await channel.prefetch(
-      this.options.prefetchCount,
+      this.options.prefetchCount!,
       this.options.globalPrefetch
     );
 
@@ -215,8 +215,8 @@ export interface ReceiveEndpointOptions
   extends Options.AssertQueue,
     Options.AssertExchange,
     Options.Consume {
-  prefetchCount: number;
-  globalPrefetch: boolean;
+  prefetchCount?: number;
+  globalPrefetch?: boolean;
   exclusive?: boolean;
   durable?: boolean;
   autoDelete?: boolean;

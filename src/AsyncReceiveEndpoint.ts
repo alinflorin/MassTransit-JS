@@ -184,7 +184,7 @@ export class AsyncReceiveEndpoint
 
   private async configureTopology(channel: ConfirmChannel) {
     await channel.prefetch(
-      this.options.prefetchCount,
+      this.options.prefetchCount!,
       this.options.globalPrefetch
     );
 
